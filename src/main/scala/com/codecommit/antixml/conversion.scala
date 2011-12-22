@@ -125,7 +125,20 @@ object XMLConvertable extends SecondPrecedenceConvertables {
       }
     
       val children = NodeSeqConvertable(xml.NodeSeq fromSeq e.child)
-      Elem(prefix, e.label, attrs, Map(), children)
+
+      // I don't know if it's right that the default namespace has the empty string, however wrapping it in an Option
+      // seems kinda overkill (and it is the way it's already modelled) - trygvis
+      var scope = e.scope
+      var scopes = Map.empty[String, String]
+
+      while(scope != null) {
+        if(scope.uri != null) {
+          scopes = scopes + (scope.uri -> Option(scope.prefix).getOrElse(""))
+        }
+        scope = scope.parent
+      }
+
+      Elem(prefix, e.label, attrs, scopes, children)
     }
   }
   

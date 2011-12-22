@@ -15,3 +15,5 @@ project/plugins/src_managed/
 .classpath
 .scala_dependencies
 java.hprof.txt
+*.swp
+.*.un~

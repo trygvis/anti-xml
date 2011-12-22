@@ -94,10 +94,18 @@ class ConversionSpecs extends Specification with ScalaCheck {
       e.prefix mustEqual Some("w")
       e.name mustEqual "test"
     }
-    
+
+    "convert elem names with declared namespaces" in {
+      val x = <w:test xmlns="urn:foo" xmlns:bar="urn:bar"/>
+      val e: Elem = x.convert
+      e.prefix mustEqual Some("w")
+      e.name mustEqual "test"
+      e.scope mustEqual Map("urn:bar" -> "bar", "urn:foo" -> "")
+    }
+
     "convert elem attributes" in {
       (<test/>).convert.attrs mustEqual Map()
-      (<test a:c="1" b="foo" xmlns:a="a"/>).convert.attrs mustEqual Attributes(QName(Some("a"), "c") -> "1", "b" -> "foo")
+      (<test a:c="1" b="foo" xmlns:a="http://boo"/>).convert.attrs mustEqual Attributes(QName(Some("a"), "c") -> "1", "b" -> "foo")
     }
     
     "convert elem children" in {
