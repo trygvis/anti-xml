@@ -30,6 +30,7 @@ package com.codecommit.antixml
 
 import org.scalacheck._
 import scala.io.Source
+import java.lang.String
 
 trait XMLGenerators {
   import Arbitrary.arbitrary
@@ -81,11 +82,11 @@ trait XMLGenerators {
   def elemGenerator(depth: Int = 0): Gen[Elem] = for {
     ns <- genSaneOptionString
     name <- genSaneString
-    prefix <- genSaneOptionString
+    namespace <- genSaneOptionString
     attrs <- genAttributes
     bindings <- genBindings
     children <- if (depth > MaxGroupDepth) value(Group()) else (listOf(nodeGenerator(depth + 1)) map Group.fromSeq)
-  } yield Elem(prefix, name, attrs, bindings, children)
+  } yield Elem(namespace.map(UnprefixedNamespaceBinding(_)).getOrElse(NamespaceBinding.empty), name, attrs, bindings, children)
   
   lazy val textGenerator: Gen[Text] = genSaneString map Text
   
@@ -107,13 +108,13 @@ trait XMLGenerators {
     listOf(genTuple)
   }
 
-  private lazy val genBindings: Gen[Map[String, String]] = {
+  private lazy val genBindings: Gen[NamespaceBinding] = {
     val genTuple = for {
-      qname <- genSaneString
-      value <- genSaneString
-    } yield (qname, value)
-    
-    listOf(genTuple) map { Map(_: _*) }
+      prefix <- genSaneString
+      uri <- genSaneString
+    } yield (prefix, uri)
+
+    listOf(genTuple).map(_.foldLeft(NamespaceBinding.empty)((parent, child) => parent.append(child._1, child._2)))
   }
 
   private lazy val genQName: Gen[QName] = for {

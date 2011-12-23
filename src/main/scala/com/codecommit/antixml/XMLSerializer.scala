@@ -78,12 +78,12 @@ class XMLSerializer(encoding: String, outputDeclaration: Boolean) {
   }
   
   def serialize(elem: Elem, w: Writer) {
-    var scopes: List[Map[String, String]] = Nil
+    var scopes: List[NamespaceBinding] = Nil
 
     def doSerialize(node: Node, w: Writer) {
       node match {
         case Elem(prefix, name, attrs, scope, children) => {
-          val parentScope = scopes.headOption getOrElse Map()
+          val parentScope = scopes.headOption getOrElse NamespaceBinding.empty
           scopes = scope :: scopes
           val attrStr = if (attrs.isEmpty) {
             ""
@@ -94,20 +94,32 @@ class XMLSerializer(encoding: String, outputDeclaration: Boolean) {
             
             " " + delta
           }
-            
-          val scopeChange = scope filter { case (key, value) => parentScope.get(key) != Some(value) }
-          val prefixesStr = if (scopeChange.isEmpty) { 
+
+//          println("scope.toList=" + scope.toList)
+//          println("parentScope.toList=" + parentScope.toList)
+          // val scopeChange = scope filter { case (key, value) => parentScope.get(key) != Some(value) }
+          val parentList = parentScope.toList
+          val scopeChange = scope.toList filterNot (parentList contains)// scope filter { case (key, value) => parentScope.get(key) != Some(value) }
+          val prefixesStr = if (scopeChange.isEmpty) {
             ""
           } else {
             val delta = scopeChange map {
-              case (key, value) =>
-                (if (key == "") "xmlns" else "xmlns:" + key) + "=" + Node.quoteAttribute(value)
+              case UnprefixedNamespaceBinding(uri, _) => "xmlns=" + Node.quoteAttribute(uri)
+              case PrefixedNamespaceBinding(p, uri, _) => "xmlns:" + p + "=" + Node.quoteAttribute(uri)
+//              case (key, value) =>
+//                (if (key == "") "xmlns" else "xmlns:" + key) + "=" + Node.quoteAttribute(value)
+              case _ => sys.error("Shouldn't happen")
             } mkString " "
             
             " " + delta
           }
-        
-          val qname = (prefix map { _ + ":" } getOrElse "") + name
+
+//          val qname = (prefix map { _ + ":" } getOrElse "") + name
+          val qname = prefix match {
+            case EmptyNamespaceBinding => name
+            case UnprefixedNamespaceBinding(uri, _) => name
+            case PrefixedNamespaceBinding(p, uri, _) => p + ":" + name
+          }
           val partial = "<" + qname + attrStr + prefixesStr
           
           if (children.isEmpty) {

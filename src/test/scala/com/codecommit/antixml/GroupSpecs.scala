@@ -339,10 +339,9 @@ class GroupSpecs extends Specification with ScalaCheck with XMLGenerators with U
     def apply[A](a: A)(implicit evidence: A =:= Expected) = evidence must not beNull
   }
 
-  def elem(name: String, children: Node*) = Elem(None, name, Attributes(), Map(), Group(children: _*))
+  def elem(name: String, children: Node*) = Elem(NamespaceBinding.empty, name, Attributes(), NamespaceBinding.empty, Group(children: _*))
 
-  def elem(qname : QName, children: Node*) = Elem(qname.prefix, qname.name, Attributes(), Map(), Group(children: _*))
+  def elem(qname : QName, children: Node*) = Elem(qname match { case QName(Some(prefix), ns) => PrefixedNamespaceBinding(prefix, ns) case QName(None, ns) => UnprefixedNamespaceBinding(ns)}, qname.name, Attributes(), NamespaceBinding.empty, Group(children: _*))
   
   val anyElem: Selector[Elem] = Selector {case e: Elem => e}
-
 }

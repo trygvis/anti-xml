@@ -150,7 +150,7 @@ class ZipperMergeStrategySpecs extends SpecificationWithJUnit {
   }
 
   
-  def elem(name: String) = Elem(None, name, Attributes(), Map(), Group())
+  def elem(name: String) = Elem(NamespaceBinding.empty, name, Attributes(), NamespaceBinding.empty, Group())
   
   def anyElem = Selector[Elem]({case x:Elem => x})
 }

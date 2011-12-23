@@ -113,32 +113,37 @@ trait XMLConvertable[-A, +B] {      // note: doesn't extend Function1 to avoid c
  * Thus, the most specific conversion is chosen in all cases.
  */
 object XMLConvertable extends SecondPrecedenceConvertables {
+
+  def scope2stream(nb: xml.NamespaceBinding): Stream[xml.NamespaceBinding] = {
+    if(nb == null)
+      Stream.empty
+    else
+      Stream.cons(nb, scope2stream(nb.parent))
+  }
+
   implicit object ElemConvertable extends XMLConvertable[xml.Elem, Elem] {
     def apply(e: xml.Elem) = {
-      val prefix = if (e.prefix == null) None else Some(e.prefix)
-      val ns = if (e.namespace == null) None else Some(e.namespace)
-        
       val attrs = (Attributes() /: e.attributes) {
         case (attrs, pa: xml.PrefixedAttribute) => attrs + (QName(Some(pa.pre), pa.key) -> pa.value.mkString)
         case (attrs, ua: xml.UnprefixedAttribute) => attrs + (ua.key -> ua.value.mkString)
         case (attrs, _) => attrs
       }
-    
+
       val children = NodeSeqConvertable(xml.NodeSeq fromSeq e.child)
 
-      // I don't know if it's right that the default namespace has the empty string, however wrapping it in an Option
-      // seems kinda overkill (and it is the way it's already modelled) - trygvis
-      var scope = e.scope
-      var scopes = Map.empty[String, String]
+      val scopes = scope2stream(e.scope).toList.filter(x => x.prefix != null || x.uri != null)
+      val namespaceBindings = scopes.foldLeft(NamespaceBinding.empty)((parent, t) => if(t.prefix == null) parent.append(t.uri) else parent.append(t.prefix, t.uri))
 
-      while(scope != null) {
-        if(scope.uri != null) {
-          scopes = scopes + (scope.uri -> Option(scope.prefix).getOrElse(""))
-        }
-        scope = scope.parent
-      }
+      val prefix = namespaceBindings.findPrefix(if(e.prefix == null) "" else e.prefix).getOrElse(NamespaceBinding.empty)
 
-      Elem(prefix, e.label, attrs, scopes, children)
+//      println("e.prefix=" + e.prefix)
+//      println("e.scope=" + e.scope)
+//      println("e.scope.getURI('')=" + e.scope.getURI(null))
+//      println("e.scope.getURI(e.prefix)=" + e.scope.getURI(e.prefix))
+//      println("namespaceBindings=" + namespaceBindings)
+//      println("namespaceBindings.findPrefix=" + namespaceBindings.findPrefix(if(e.prefix == null) "" else e.prefix))
+
+      Elem(prefix.looseParent, e.label, attrs, namespaceBindings, children)
     }
   }
   

@@ -49,7 +49,7 @@ class NodeSeqSAXHandler extends DefaultHandler2 {
   private var elems = List[Group[Node] => Elem]()
   private val text = new StringBuilder
   private var isCDATA = false
-  private var scopes = Map[String, String]() :: Nil
+  private var scopes = NamespaceBinding.empty
   
   private var builders = VectorCase.newBuilder[Node] :: Nil
   
@@ -59,17 +59,11 @@ class NodeSeqSAXHandler extends DefaultHandler2 {
   }
 
   override def startPrefixMapping(prefix: String, namespace: String) {
-    // This is an optimization to not generate a new map if the mapping exists
-    // already.
-    val parentScope = scopes.headOption getOrElse Map()
-    scopes ::= (if (parentScope.get(prefix) == Some(namespace))
-    	parentScope
-      else 
-        parentScope + (prefix -> namespace) )
+    scopes = if(prefix.isEmpty) scopes.append(namespace) else scopes.append(prefix, namespace)
   }
 
   override def endPrefixMapping(prefix: String) {
-    scopes = scopes.tail
+    scopes = scopes.parent.getOrElse(NamespaceBinding.empty)
   }
 
   override def endCDATA() {
@@ -84,6 +78,29 @@ class NodeSeqSAXHandler extends DefaultHandler2 {
   override def startElement(uri: String, localName: String, qName: String, attrs: SAXAttributes) {
     clearText()
     
+/*
+
+<a/>
+  uri:
+  localName: a
+  qName: a
+
+<a xmlns='urn:a'/>
+  uri: urn:a
+  localName: a
+  qName: a
+
+<pf:a xmlns:pf='urn:a'/>
+  uri: urn:a
+  localName: a
+  qName: pf:a
+
+
+    println("startElement")
+    println("uri: " + uri)
+    println("localName: " + localName)
+    println("qName: " + qName)
+ */
     // need to do this early since SAXAttributes objects may be reused
     val map = (0 until attrs.getLength).foldLeft(Attributes()) { (map, i) =>
       val localName = attrs.getLocalName(i)
@@ -98,12 +115,14 @@ class NodeSeqSAXHandler extends DefaultHandler2 {
 
     builders ::= VectorCase.newBuilder
     elems ::= { children =>
-      val prefix = if (qName == localName)
-        None
+      val prefix = if (uri.isEmpty)
+        NamespaceBinding.empty
+      else if (qName == localName)
+        UnprefixedNamespaceBinding(uri)
       else
-        Some(qName.substring(0, qName.length - localName.length - 1))
-      
-      Elem(prefix, localName, map, scopes.headOption getOrElse Map(), children)
+        PrefixedNamespaceBinding(qName.substring(0, qName.length - localName.length - 1), uri)
+
+      Elem(prefix, localName, map, scopes, children)
     }
   }
 

@@ -182,7 +182,7 @@ class PathCreatorSpecs extends SpecificationWithJUnit {
     
   }
   
-  def elem(name: String) = Elem(None, name, Attributes(), Map(), Group())
+  def elem(name: String) = Elem(NamespaceBinding.empty, name, Attributes(), NamespaceBinding.empty, Group())
   
   /** 
    * Returns the indices of the specified PathVal starting at the top.  Note that depth-first

@@ -141,16 +141,15 @@ case class ProcInstr(target: String, data: String) extends Node {
  * {{{
  * Elem(None, "span", Attributes("id" -> "foo", "class" -> "bar"), Map(), Group(Text("Lorem ipsum")))
  * }}}
+ *
+ * TODO: Clean up naming. Options:
+ * 1) Rename prefix to namespace, scope to namespaces
+ * 2) Remove prefix, rename scope to namespace(s), assume that the first is the name of the current element
+ * 3) Rename prefix to namespace, scope to namespaces.
  */
-case class Elem(prefix: Option[String], name: String, attrs: Attributes, scope: Map[String, String], override val children: Group[Node]) extends Node with Selectable[Elem] {
+case class Elem(prefix: NamespaceBinding, name: String, attrs: Attributes, scope: NamespaceBinding, override val children: Group[Node]) extends Node with Selectable[Elem] {
   import Elem.isValidName
-  
-  for (p <- prefix) {
-    if (! isValidName(p)) {
-      throw new IllegalArgumentException("Illegal element prefix, '" + p + "'")
-    }
-  }
-  
+
   if (! isValidName(name)) {
     throw new IllegalArgumentException("Illegal element name, '" + name + "'")
   }
@@ -170,12 +169,112 @@ case class Elem(prefix: Option[String], name: String, attrs: Attributes, scope: 
   def toGroup = Group(this)
 }
 
-object Elem extends ((Option[String], String, Attributes, Map[String, String], Group[Node]) => Elem) {
+object Elem extends ((NamespaceBinding, String, Attributes, NamespaceBinding, Group[Node]) => Elem) {
   private[this] val NameRegex = {
     val nameStartChar = """:A-Z_a-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD"""
     "[" + nameStartChar + "][" + nameStartChar + """\-\.0-9\u00B7\u0300-\u036F\u203F-\u2040]*"""r
   }
   def isValidName(string: String) = NameRegex.pattern.matcher(string).matches
+}
+
+/*
+ * The URI is required and cannot be an empty namespace name. See "2.2 Use of URIs as Namespace Names", "The empty
+ * string, though it is a legal URI reference, cannot be used as a namespace name.".
+ *
+ * TODO: I wonder, should NB be exactly like a linked list that always end with an EmptyNB? That way there won't be
+  * any need for any options probably giving significant performance savings when matching and extracting.
+ */
+sealed trait NamespaceBinding {
+  def uri: Option[String]
+
+  def parent: Option[NamespaceBinding]
+
+  def isEmpty: Boolean
+
+//  def append(child: NamespaceBinding): NamespaceBinding = child match {
+//    case EmptyNamespaceBinding => this
+//    case UnprefixedNamespaceBinding(uri, _) => new UnprefixedNamespaceBinding(uri, Some(this))
+//    case PrefixedNamespaceBinding(prefix, uri, _) => PrefixedNamespaceBinding(prefix, uri, Some(this))
+//  }
+
+  def append(uri: String): NamespaceBinding = new UnprefixedNamespaceBinding(uri, Some(this))
+
+  def append(prefix: String, uri: String): NamespaceBinding = new PrefixedNamespaceBinding(prefix, uri, Some(this))
+
+  def findPrefix(prefix: String): Option[NamespaceBinding] = this match {
+    case UnprefixedNamespaceBinding(_, _) if(prefix.isEmpty) => Some(this)
+    case UnprefixedNamespaceBinding(_, Some(parent)) => parent.findPrefix(prefix)
+    case UnprefixedNamespaceBinding(_, None) => None
+    case PrefixedNamespaceBinding(p, _, Some(parent)) => if(p.equals(prefix)) Some(this) else parent.findPrefix(prefix)
+    case PrefixedNamespaceBinding(p, _, None) => if(p.equals(prefix)) Some(this) else None
+    case EmptyNamespaceBinding => None
+  }
+
+  /**
+   * This is probably not a good idea.
+   */
+  def looseParent: NamespaceBinding
+
+//  def -(parent: NamespaceBinding): NamespaceBinding = {
+//    val b = new ListBuffer[NamespaceBinding]
+//    var these = Some(this)
+//    while (!these.isEmpty) {
+//      if (these.head != x)
+//        b += these.head
+//      these = these.parent
+//    }
+//  }
+
+  def toList: List[NamespaceBinding] = {
+    def toStream(nb: NamespaceBinding): Stream[NamespaceBinding] = Stream.cons(nb, if(nb.parent.isDefined) toStream(nb.parent.get) else Stream.empty)
+    toStream(this).toList
+  }
+}
+
+object NamespaceBinding {
+  val empty: NamespaceBinding = EmptyNamespaceBinding
+
+  def apply(t: (String, String)) = new PrefixedNamespaceBinding(t._1, t._2, None)
+
+  def apply(t: (String, String), parent: NamespaceBinding) = new PrefixedNamespaceBinding(t._1, t._2, Some(parent))
+
+  def apply(prefix: String,  uri: String, parent: NamespaceBinding) = new PrefixedNamespaceBinding(prefix, uri, Some(parent))
+
+  def apply(prefix: String,  uri: String) = new PrefixedNamespaceBinding(prefix, uri, None)
+
+  def apply(uri: String, parent: NamespaceBinding) = new UnprefixedNamespaceBinding(uri, Some(parent))
+
+  def apply(uri: String) = new UnprefixedNamespaceBinding(uri, None)
+}
+
+case object EmptyNamespaceBinding extends NamespaceBinding {
+  def uri = None
+  def parent = None
+  def isEmpty = true
+
+  override def append(uri: String): NamespaceBinding = new UnprefixedNamespaceBinding(uri, None)
+
+  override def append(prefix: String, uri: String): NamespaceBinding = new PrefixedNamespaceBinding(prefix, uri, None)
+
+  def looseParent = this
+
+  override def toList = List.empty
+}
+
+case class PrefixedNamespaceBinding(prefix: String, _uri: String,  override val parent: Option[NamespaceBinding] = None) extends NamespaceBinding {
+  if (! Elem.isValidName(prefix)) {
+    throw new IllegalArgumentException("Illegal namespace prefix, '" + prefix + "'")
+  }
+
+  def uri = Some(_uri)
+  def isEmpty = false
+  def looseParent = PrefixedNamespaceBinding(prefix, _uri, None)
+}
+
+case class UnprefixedNamespaceBinding(_uri: String,  override val parent: Option[NamespaceBinding] = None) extends NamespaceBinding {
+  def uri = None
+  def isEmpty = false
+  def looseParent = UnprefixedNamespaceBinding(_uri, None)
 }
 
 /**

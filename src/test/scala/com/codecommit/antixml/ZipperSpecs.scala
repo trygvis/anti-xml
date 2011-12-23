@@ -333,7 +333,7 @@ class ZipperSpecs extends SpecificationWithJUnit with ScalaCheck  with XMLGenera
         bookElem <- bookstore \ "book"
         title <- bookElem \ "title" \ text
         if !title.trim.isEmpty
-        val filteredChildren = bookElem.children filter { case Elem(None, "title", _, _, _) => false case _ => true }
+        val filteredChildren = bookElem.children filter { case Elem(NamespaceBinding.empty, "title", _, _, _) => false case _ => true }
       } yield bookElem.copy(attrs=(bookElem.attrs + ("title" -> title)), children=filteredChildren)
       
       val bookstore2 = titledBooks.unselect
@@ -376,7 +376,7 @@ class ZipperSpecs extends SpecificationWithJUnit with ScalaCheck  with XMLGenera
       val bookstore2 = (books filter (books(1) !=)).unselect
       
       bookstore2.head must beLike {
-        case Elem(None, "bookstore", attrs, scopes, children) if attrs.isEmpty && scopes.isEmpty => {
+        case Elem(NamespaceBinding.empty, "bookstore", attrs, scopes, children) if attrs.isEmpty && scopes.isEmpty => {
           children must haveSize(2)
           children \ 'title \ text mustEqual Vector("For Whom the Bell Tolls", "Programming Scala")
         }
@@ -388,7 +388,7 @@ class ZipperSpecs extends SpecificationWithJUnit with ScalaCheck  with XMLGenera
       val bookstore2 = (books filter (books(0) !=) filter (books(1) !=)).unselect
       
       bookstore2.head must beLike {
-        case Elem(None, "bookstore", attrs, scopes, children) if attrs.isEmpty && scopes.isEmpty => {
+        case Elem(NamespaceBinding.empty, "bookstore", attrs, scopes, children) if attrs.isEmpty && scopes.isEmpty => {
           children must haveSize(1)
           children \ 'title \ text mustEqual Vector("Programming Scala")
         }
@@ -410,7 +410,7 @@ class ZipperSpecs extends SpecificationWithJUnit with ScalaCheck  with XMLGenera
       val bookstore2 = (titles filter (titles(1) !=)).unselect.unselect
       
       bookstore2.head must beLike {
-        case Elem(None, "bookstore", attrs, scopes, children) if attrs.isEmpty && scopes.isEmpty =>
+        case Elem(NamespaceBinding.empty, "bookstore", attrs, scopes, children) if attrs.isEmpty && scopes.isEmpty =>
           children must haveSize(3)
       }
       
@@ -424,7 +424,7 @@ class ZipperSpecs extends SpecificationWithJUnit with ScalaCheck  with XMLGenera
       val bookstore2 = (books filter (books(1) !=) filter (books(0) !=)).unselect
       
       bookstore2.head must beLike {
-        case Elem(None, "bookstore", attrs, scopes, children) if attrs.isEmpty && scopes.isEmpty => {
+        case Elem(NamespaceBinding.empty, "bookstore", attrs, scopes, children) if attrs.isEmpty && scopes.isEmpty => {
           children must haveSize(1)
           children \ 'title \ text mustEqual Vector("Programming Scala")
         }
@@ -962,8 +962,8 @@ class ZipperSpecs extends SpecificationWithJUnit with ScalaCheck  with XMLGenera
   def resource(filename: String) =
     XML fromSource (Source fromURL (getClass getResource ("/" + filename)))
 
-  def elem(name: String) = Elem(None, name, Attributes(), Map(), Group())
-  def elem(name: String, children: Node*) = Elem(None, name, Attributes(), Map(), Group(children: _*))
+  def elem(name: String) = Elem(NamespaceBinding.empty, name, Attributes(), NamespaceBinding.empty, Group())
+  def elem(name: String, children: Node*) = Elem(NamespaceBinding.empty, name, Attributes(), NamespaceBinding.empty, Group(children: _*))
   
   def textNode(s: scala.util.matching.Regex) = Selector[Text]({
     case t: Text if s.pattern.matcher(t.text).matches() => t

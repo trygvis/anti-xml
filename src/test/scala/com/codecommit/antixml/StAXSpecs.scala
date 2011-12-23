@@ -32,23 +32,42 @@ import org.specs2.mutable._
 
 class StAXSpecs extends Specification {
   object StAXParser extends StAXParser
-  
+
   "StAXParser" should {
-    "parse a StreamSource and generate an Elem" in {
-      
-      StAXParser.fromString("<a:a xmlns:a='a'>hi<b attr='value' /> there</a:a>") mustEqual Elem(Some("a"), "a", Attributes(), Map("a" -> "a"), Group(Text("hi"), Elem(None, "b", Attributes("attr" -> "value"), Map("a" -> "a"), Group()), Text(" there")))
+    "parse a simple element" in {
+      StAXParser.fromString("<a/>") mustEqual Elem(NamespaceBinding.empty, "a", Attributes(), NamespaceBinding.empty, Group())
     }
     
+    "parse an element with namespace" in {
+      StAXParser.fromString("<a xmlns='urn:a'/>") mustEqual Elem(NamespaceBinding("urn:a"), "a", Attributes(), NamespaceBinding("urn:a"), Group())
+    }
+
+    "parse an element with default namespace prefix" in {
+      StAXParser.fromString("<a xmlns='urn:a'><b/></a>") mustEqual Elem(NamespaceBinding("urn:a"), "a", Attributes(), NamespaceBinding("urn:a"), Group(Elem(NamespaceBinding("urn:a"), "b", Attributes(), NamespaceBinding("urn:a"), Group())))
+    }
+
+    "parse an element with default namespace prefix" in {
+      StAXParser.fromString("<a xmlns='urn:a' xmlns:x='urn:x'><b/></a>") mustEqual Elem(NamespaceBinding("urn:a"), "a", Attributes(), NamespaceBinding("x", "urn:x", NamespaceBinding("urn:a")), Group(Elem(NamespaceBinding("urn:a"), "b", Attributes(), NamespaceBinding("x", "urn:x", NamespaceBinding("urn:a")), Group())))
+    }
+
+    "parse an element with default namespace prefix and child element with a re-defined default namespace" in {
+      StAXParser.fromString("<a xmlns='urn:a'><b xmlns='urn:b'/></a>") mustEqual Elem(NamespaceBinding("urn:a"), "a", Attributes(), NamespaceBinding("urn:a"), Group(Elem(NamespaceBinding("urn:b"), "b", Attributes(), NamespaceBinding("urn:b", NamespaceBinding("urn:a")), Group())))
+    }
+
+    "parse a simpleString and generate an Elem" in {
+      StAXParser.fromString("<a:a xmlns:a='urn:a'>hi<b attr='value' /> there</a:a>") mustEqual Elem(PrefixedNamespaceBinding("a", "urn:a"), "a", Attributes(), NamespaceBinding("a", "urn:a"), Group(Text("hi"), Elem(NamespaceBinding.empty, "b", Attributes("attr" -> "value"), NamespaceBinding("a", "urn:a"), Group()), Text(" there")))
+    }
+
     "parse a simpleString with an non-prefixed namespace" in {
-      StAXParser.fromString("<a xmlns='urn:a'/>") mustEqual Elem(None, "a", Attributes(), Map("" -> "urn:a"), Group())
-    }
-    
-    "parse a simpleString with both a namespace and an attribute" in {
-      StAXParser.fromString("<a xmlns='urn:a' key='val' />") mustEqual Elem(None, "a", Attributes("key"->"val"), Map("" -> "urn:a"), Group())
+      StAXParser.fromString("<a xmlns='urn:a'/>") mustEqual Elem(NamespaceBinding("urn:a"), "a", Attributes(), NamespaceBinding("urn:a"), Group())
     }
 
     "parse a simpleString with both a namespace and an attribute" in {
-      StAXParser.fromString("<a xmlns='urn:a' xmlns:b='urn:b-ns' key='val'><b:foo/></a>") mustEqual Elem(None, "a", Attributes("key"->"val"), Map("" -> "urn:a", "b" -> "urn:b-ns"), Group())
+      StAXParser.fromString("<a xmlns='urn:a' key='val' />") mustEqual Elem(NamespaceBinding("urn:a"), "a", Attributes("key"->"val"), NamespaceBinding("urn:a"), Group())
+    }
+
+    "parse a simpleString with both a namespace and an attribute" in {
+      StAXParser.fromString("<a xmlns='urn:a' xmlns:b='urn:b-ns' key='val'><b:foo/></a>") mustEqual Elem(NamespaceBinding("urn:a"), "a", Attributes("key"->"val"), NamespaceBinding("b", "urn:b-ns", NamespaceBinding("urn:a")), Group(Elem(NamespaceBinding("b", "urn:b-ns"), "foo", Attributes(), NamespaceBinding("b", "urn:b-ns", NamespaceBinding("urn:a")), Group())))
     }
   }
 }

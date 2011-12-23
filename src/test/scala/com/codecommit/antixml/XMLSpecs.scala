@@ -63,7 +63,8 @@ class XMLSpecs extends Specification {
 
     "preserve prefixes" in {
       val ns = "urn:my-urn:quux";
-      fromString("<my:test xmlns:my='urn:my-urn:quux'/>") mustEqual Elem(Some("my"), "test", Attributes(), Map("my" -> ns), Group[Node]())
+      val e = fromString("<my:test xmlns:my='urn:my-urn:quux'/>")
+      fromString("<my:test xmlns:my='urn:my-urn:quux'/>") mustEqual Elem(NamespaceBinding("my", ns), "test", Attributes(), NamespaceBinding("my", ns), Group[Node]())
     }
     
     "parse prefixes" in {
@@ -93,5 +94,5 @@ class XMLSpecs extends Specification {
     }
   }
   
-  def elem(name: QName, children: Node*) = Elem(name.prefix, name.name, Attributes(), Map(), Group(children: _*))
+  def elem(name: String, children: Node*) = Elem(NamespaceBinding.empty, name, Attributes(), NamespaceBinding.empty, Group(children: _*))
 }

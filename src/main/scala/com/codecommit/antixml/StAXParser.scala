@@ -30,10 +30,21 @@ package com.codecommit.antixml
 
 import util.VectorCase
 import java.io.{InputStream, StringReader, Reader}
-import javax.xml.stream.{XMLInputFactory, XMLStreamException}
+import javax.xml.stream._
 import javax.xml.stream.XMLStreamConstants
 import javax.xml.transform.stream.StreamSource
-import javax.xml.XMLConstants.NULL_NS_URI
+
+/*
+<a/>
+  START_ELEMENT, xmlReader.getNamespaceCount=0
+
+<a xmlns='urn:a'/>
+  START_ELEMENT, xmlReader.getNamespaceCount=1
+  xmlReader.getNamespaceURI(i)=urn:a
+  rawPrefix=null
+  prefix=
+
+ */
 
 /**
  * An XML parser build on top of `javax.xml.stream`.  This implements the same
@@ -51,14 +62,15 @@ class StAXParser extends XMLParser {
   override def fromString(xml: String): Elem =
     fromReader(new StringReader(xml))
   
-  private case class ElemBuilder(name: String, prefix: Option[String], attrs: Attributes)
+  private case class ElemBuilder(prefix: NamespaceBinding, name: String, scope: NamespaceBinding, attrs: Attributes)
 
   private def fromStreamSource(source: StreamSource): Elem = {
     import XMLStreamConstants.{CDATA => CDATAFlag, CHARACTERS, COMMENT, DTD, END_ELEMENT, END_DOCUMENT, PROCESSING_INSTRUCTION, START_ELEMENT, ENTITY_REFERENCE, NAMESPACE}
 
     val xmlReader = XMLInputFactory.newInstance().createXMLStreamReader(source)
     var elems: List[ElemBuilder] = Nil
-    var prefixMapping = Map[String, String]() :: Nil
+    var scopes = NamespaceBinding.empty
+//    var prefixMapping = Map[String, String]() :: Nil
     var results = VectorCase.newBuilder[Node] :: Nil
     val text = new StringBuilder
     while(xmlReader.hasNext) {
@@ -70,16 +82,18 @@ class StAXParser extends XMLParser {
           val parents = elems.tail
           val children = results.head
           val ancestors = results.tail
-          val mapping = {
-            val back = prefixMapping.head
-            prefixMapping = prefixMapping.tail
-            back
-          }
+//          scopes = scopes.looseParent
+
+//          val mapping = {
+//            val back = prefixMapping.head
+//            prefixMapping = prefixMapping.tail
+//            back
+//          }
           if (text.size > 0) {
             children += Text(text.result)
             text.clear()
           }
-          ancestors.head += Elem(elem.prefix, elem.name, elem.attrs, mapping, Group fromSeq children.result)
+          ancestors.head += Elem(elem.prefix, elem.name, elem.attrs, elem.scope, Group fromSeq children.result)
           elems = parents
           results = ancestors
         }
@@ -89,19 +103,41 @@ class StAXParser extends XMLParser {
             text.clear()
           }
           var i = 0
-          var prefixes = prefixMapping.headOption getOrElse Map()
+//          println("START_ELEMENT")
+//          println("xmlReader.getNamespaceURI=" + xmlReader.getNamespaceURI)
+//          println("xmlReader.getPrefix=" + xmlReader.getPrefix)
+//          println("xmlReader.getLocalName=" + xmlReader.getLocalName)
+//          println("xmlReader.getNamespaceCount=" + xmlReader.getNamespaceCount)
           while (i < xmlReader.getNamespaceCount) {
             val ns = xmlReader.getNamespaceURI(i)
+//            println("xmlReader.getNamespaceURI(i)=" + xmlReader.getNamespaceURI(i))
             val rawPrefix = xmlReader.getNamespacePrefix(i)
+//            println("rawPrefix=" + xmlReader.getNamespacePrefix(i))
             val prefix = if (rawPrefix != null) rawPrefix else "" 
-
-            // To conserve memory, only save prefix if changed
-            if (prefixes.get(prefix) != Some(ns)) {
-              prefixes = prefixes + (prefix -> ns)
-            }
+//            println("prefix=" + prefix)
+            scopes =
+              if (xmlReader.getNamespacePrefix(i) == null) {
+                val uri = xmlReader.getNamespaceURI(i)
+                scopes.append(if(uri == null) "" else uri)
+              }
+              else
+                scopes.append(prefix, xmlReader.getNamespaceURI(i))
             i = i + 1
           }
-          prefixMapping ::= prefixes
+//          println("scopes=" + scopes)
+//          var prefixes = prefixMapping.headOption getOrElse Map()
+//          while (i < xmlReader.getNamespaceCount) {
+//            val ns = xmlReader.getNamespaceURI(i)
+//            val rawPrefix = xmlReader.getNamespacePrefix(i)
+//            val prefix = if (rawPrefix != null) rawPrefix else ""
+//
+//            // To conserve memory, only save prefix if changed
+//            if (prefixes.get(prefix) != Some(ns)) {
+//              prefixes = prefixes + (prefix -> ns)
+//            }
+//            i = i + 1
+//          }
+//          prefixMapping ::= prefixes
           i = 0
           var attrs = Attributes()
           while (i < xmlReader.getAttributeCount) {
@@ -113,9 +149,17 @@ class StAXParser extends XMLParser {
             attrs = attrs + (QName(prefix, localName) -> xmlReader.getAttributeValue(i))
             i = i + 1
           }
-          val prefix = xmlReader.getPrefix
-          elems ::= ElemBuilder(xmlReader.getLocalName,
-              if (prefix == null || prefix == "") None else Some(prefix), attrs)
+          val prefix =
+            if(xmlReader.getPrefix.isEmpty) {
+              val uri = xmlReader.getNamespaceURI
+              if(uri == null)
+                NamespaceBinding.empty
+              else
+                NamespaceBinding(uri)
+            }
+            else
+              NamespaceBinding(xmlReader.getPrefix, xmlReader.getNamespaceURI)
+          elems ::= ElemBuilder(prefix, xmlReader.getLocalName, scopes, attrs)
            results ::= VectorCase.newBuilder[Node]           
         }
         case _ =>
