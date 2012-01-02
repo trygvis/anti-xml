@@ -247,7 +247,11 @@ object NamespaceBinding {
   def apply(uri: String) = new UnprefixedNamespaceBinding(uri, None)
 }
 
-case object EmptyNamespaceBinding extends NamespaceBinding {
+object NamespaceUri {
+  def unapply(namespaceBinding: NamespaceBinding) = namespaceBinding.uri
+}
+
+private [antixml] case object EmptyNamespaceBinding extends NamespaceBinding {
   def uri = None
   def parent = None
   def isEmpty = true
@@ -272,7 +276,7 @@ case class PrefixedNamespaceBinding(prefix: String, _uri: String,  override val 
 }
 
 case class UnprefixedNamespaceBinding(_uri: String,  override val parent: Option[NamespaceBinding] = None) extends NamespaceBinding {
-  def uri = None
+  def uri = Some(_uri)
   def isEmpty = false
   def looseParent = UnprefixedNamespaceBinding(_uri, None)
 }

@@ -55,7 +55,7 @@ class StAXSpecs extends Specification {
     }
 
     "parse a simpleString and generate an Elem" in {
-      StAXParser.fromString("<a:a xmlns:a='urn:a'>hi<b attr='value' /> there</a:a>") mustEqual Elem(PrefixedNamespaceBinding("a", "urn:a"), "a", Attributes(), NamespaceBinding("a", "urn:a"), Group(Text("hi"), Elem(NamespaceBinding.empty, "b", Attributes("attr" -> "value"), NamespaceBinding("a", "urn:a"), Group()), Text(" there")))
+      StAXParser.fromString("<a:a xmlns:a='urn:a'>hi<b attr='value' /> there</a:a>") mustEqual Elem(PrefixedNamespaceBinding("a", "urn:a"), "a", Attributes(), NamespaceBinding("a", "urn:a"), Group(Text("hi"), Elem(NamespaceBinding.empty, "b", Attributes(QName(None, "attr") -> "value"), NamespaceBinding("a", "urn:a"), Group()), Text(" there")))
     }
 
     "parse a simpleString with an non-prefixed namespace" in {

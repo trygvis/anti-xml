@@ -121,7 +121,7 @@ trait Selectable[+A <: Node] {
    * search through the tree, all the way from the root down to the leaves.  Note that 
    * the recursion does not short circuit when a result is found.  Thus, if a parent 
    * node matches the selector as well as one of its children, then both the parent ''and'' 
-   * the child will be returned, with the parent preceeding the child in the results.
+   * the child will be returned, with the parent preceding the child in the results.
    *
    * Just as with shallow selection, the very outermost level of the group is not
    * considered in the selection.  Thus, deep selection is not ''exactly'' the

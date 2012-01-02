@@ -60,7 +60,21 @@ object Selector {
       def isDefinedAt(node: Node) = pf isDefinedAt node
       def canMatchIn(group: Group[Node]) = group.matches(hash)
     }
-  
+
+  implicit def tupleToSelector(t: (String, String)): Selector[Elem] =
+    new OptimizingSelector[Elem] {
+      val namespace = t._1
+      val name = t._2
+      private val pf: PartialFunction[Node, Elem] = {
+        case e @ Elem(nb, `name`, _, _, _) if nb.uri.exists(namespace ==) =>
+          e
+      }
+      private val hash = Group.bloomFilterHash(name)
+
+      def apply(node: Node) = pf(node)
+      def isDefinedAt(node: Node) = pf isDefinedAt node
+      def canMatchIn(group: Group[Node]) = group.matches(hash)
+    }
 
   /**
    * Implicitly lifts a [[scala.Symbol]] into an instance of [[com.codecommit.antixml.Selector]]
