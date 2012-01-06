@@ -108,6 +108,15 @@ class ConversionSpecs extends Specification with ScalaCheck {
       e.scope mustEqual NamespaceBinding("urn:foo")
     }
 
+    // Test case for https://github.com/djspiewak/anti-xml/issues/79
+    "convert unprefixed elements and children with namespaces" in {
+      val e: Elem = <foo xmlns="urn:a"><bar/></foo>.convert
+      e.prefix mustEqual NamespaceBinding("urn:a")
+      e.name mustEqual "foo"
+      e.scope mustEqual NamespaceBinding("urn:a")
+      e.children(0).asInstanceOf[Elem].prefix mustEqual NamespaceBinding("urn:a")
+    }
+
     "convert elem names with namespaces declared" in {
       val e = <test xmlns:w="urn:foo"/>.convert
       e.prefix mustEqual NamespaceBinding.empty
