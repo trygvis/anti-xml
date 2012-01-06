@@ -69,5 +69,15 @@ class StAXSpecs extends Specification {
     "parse a simpleString with both a namespace and an attribute" in {
       StAXParser.fromString("<a xmlns='urn:a' xmlns:b='urn:b-ns' key='val'><b:foo/></a>") mustEqual Elem(NamespaceBinding("urn:a"), "a", Attributes("key"->"val"), NamespaceBinding("b", "urn:b-ns", NamespaceBinding("urn:a")), Group(Elem(NamespaceBinding("b", "urn:b-ns"), "foo", Attributes(), NamespaceBinding("b", "urn:b-ns", NamespaceBinding("urn:a")), Group())))
     }
+
+    "reuse namespace binding objects, 1" in {
+      val e = StAXParser.fromString("<a xmlns='urn:a'><b/></a>")
+      e.prefix must beTheSameAs(e.children.head.asInstanceOf[Elem].prefix)
+    }
+
+    "reuse namespace binding objects even if it's re-declared" in {
+      val e = StAXParser.fromString("<a xmlns='urn:a'><b xmlns='urn:a'/></a>")
+      e.prefix must beTheSameAs(e.children.head.asInstanceOf[Elem].prefix)
+    }
   }
 }

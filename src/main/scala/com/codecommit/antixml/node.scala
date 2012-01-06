@@ -28,8 +28,6 @@
 
 package com.codecommit.antixml
 
-import java.io.Writer
-
 /**
  * Root of the `Node` ADT, representing the different types of supported XML
  * nodes which may appear in an XML fragment.  The ADT itself has the following
@@ -183,6 +181,9 @@ object Elem extends ((NamespaceBinding, String, Attributes, NamespaceBinding, Gr
  *
  * TODO: I wonder, should NB be exactly like a linked list that always end with an EmptyNB? That way there won't be
   * any need for any options probably giving significant performance savings when matching and extracting.
+  *
+  * TODO: Implement javax.xml.namespace.NamespaceContext#getPrefixes. Lists all the prefixes *this* URI is bound to.
+  * See http://docs.oracle.com/javase/6/docs/api/javax/xml/namespace/NamespaceContext.html#getPrefixes(java.lang.String)
  */
 sealed trait NamespaceBinding {
   def uri: Option[String]
@@ -190,12 +191,6 @@ sealed trait NamespaceBinding {
   def parent: Option[NamespaceBinding]
 
   def isEmpty: Boolean
-
-//  def append(child: NamespaceBinding): NamespaceBinding = child match {
-//    case EmptyNamespaceBinding => this
-//    case UnprefixedNamespaceBinding(uri, _) => new UnprefixedNamespaceBinding(uri, Some(this))
-//    case PrefixedNamespaceBinding(prefix, uri, _) => PrefixedNamespaceBinding(prefix, uri, Some(this))
-//  }
 
   def append(uri: String): NamespaceBinding = new UnprefixedNamespaceBinding(uri, Some(this))
 
@@ -214,16 +209,6 @@ sealed trait NamespaceBinding {
    * This is probably not a good idea.
    */
   def looseParent: NamespaceBinding
-
-//  def -(parent: NamespaceBinding): NamespaceBinding = {
-//    val b = new ListBuffer[NamespaceBinding]
-//    var these = Some(this)
-//    while (!these.isEmpty) {
-//      if (these.head != x)
-//        b += these.head
-//      these = these.parent
-//    }
-//  }
 
   def toList: List[NamespaceBinding] = {
     def toStream(nb: NamespaceBinding): Stream[NamespaceBinding] = Stream.cons(nb, if(nb.parent.isDefined) toStream(nb.parent.get) else Stream.empty)
@@ -266,7 +251,7 @@ private [antixml] case object EmptyNamespaceBinding extends NamespaceBinding {
 }
 
 case class PrefixedNamespaceBinding(prefix: String, _uri: String,  override val parent: Option[NamespaceBinding] = None) extends NamespaceBinding {
-  if (! Elem.isValidName(prefix)) {
+  if (!Elem.isValidName(prefix)) {
     throw new IllegalArgumentException("Illegal namespace prefix, '" + prefix + "'")
   }
 

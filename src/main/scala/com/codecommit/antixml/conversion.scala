@@ -136,13 +136,6 @@ object XMLConvertable extends SecondPrecedenceConvertables {
 
       val prefix = namespaceBindings.findPrefix(if(e.prefix == null) "" else e.prefix).getOrElse(NamespaceBinding.empty)
 
-//      println("e.prefix=" + e.prefix)
-//      println("e.scope=" + e.scope)
-//      println("e.scope.getURI('')=" + e.scope.getURI(null))
-//      println("e.scope.getURI(e.prefix)=" + e.scope.getURI(e.prefix))
-//      println("namespaceBindings=" + namespaceBindings)
-//      println("namespaceBindings.findPrefix=" + namespaceBindings.findPrefix(if(e.prefix == null) "" else e.prefix))
-
       Elem(prefix.looseParent, e.label, attrs, namespaceBindings, children)
     }
   }

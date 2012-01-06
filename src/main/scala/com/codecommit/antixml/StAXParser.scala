@@ -62,15 +62,17 @@ class StAXParser extends XMLParser {
   override def fromString(xml: String): Elem =
     fromReader(new StringReader(xml))
   
-  private case class ElemBuilder(prefix: NamespaceBinding, name: String, scope: NamespaceBinding, attrs: Attributes)
+  private case class ElemBuilder(name: String, namespaces: NamespaceBinding, attrs: Attributes)
 
   private def fromStreamSource(source: StreamSource): Elem = {
-    import XMLStreamConstants.{CDATA => CDATAFlag, CHARACTERS, COMMENT, DTD, END_ELEMENT, END_DOCUMENT, PROCESSING_INSTRUCTION, START_ELEMENT, ENTITY_REFERENCE, NAMESPACE}
+    import XMLStreamConstants.{CHARACTERS, END_ELEMENT, START_ELEMENT}
 
     val xmlReader = XMLInputFactory.newInstance().createXMLStreamReader(source)
     var elems: List[ElemBuilder] = Nil
+    // Map of all used namespaces as empty lists. Enables reuse of instances.
+    var unprefixedNamespaceMap = Map[String, UnprefixedNamespaceBinding]()
+    var prefixedNamespaceMap = Map[(String, String), PrefixedNamespaceBinding]()
     var scopes = NamespaceBinding.empty
-//    var prefixMapping = Map[String, String]() :: Nil
     var results = VectorCase.newBuilder[Node] :: Nil
     val text = new StringBuilder
     while(xmlReader.hasNext) {
@@ -82,24 +84,45 @@ class StAXParser extends XMLParser {
           val parents = elems.tail
           val children = results.head
           val ancestors = results.tail
-//          scopes = scopes.looseParent
 
-//          val mapping = {
-//            val back = prefixMapping.head
-//            prefixMapping = prefixMapping.tail
-//            back
-//          }
+          val uri = xmlReader.getNamespaceURI
+          val prefix = xmlReader.getPrefix
+
+          val p = if(uri == null)
+            NamespaceBinding.empty
+          else {
+            if(prefix == null || prefix.equals("")) {
+              unprefixedNamespaceMap.get(uri) match {
+                case Some(nb) => nb
+                case None =>
+                  val x = NamespaceBinding(uri)
+                  unprefixedNamespaceMap = unprefixedNamespaceMap + (uri -> x)
+                  x
+              }
+            }
+            else {
+              prefixedNamespaceMap.get((prefix, uri)) match {
+                case Some(nb) => nb
+                case None =>
+                  val x = NamespaceBinding(prefix, uri)
+                  prefixedNamespaceMap = prefixedNamespaceMap + ((prefix, uri) -> x)
+                  x
+              }
+            }
+          }
+
           if (text.size > 0) {
-            children += Text(text.result)
+            children += Text(text.result())
             text.clear()
           }
-          ancestors.head += Elem(elem.prefix, elem.name, elem.attrs, elem.scope, Group fromSeq children.result)
+
+          ancestors.head += Elem(p, elem.name, elem.attrs, elem.namespaces, Group fromSeq children.result)
           elems = parents
           results = ancestors
         }
         case `START_ELEMENT` => {
           if (text.size > 0) {
-            results.head += Text(text.result)
+            results.head += Text(text.result())
             text.clear()
           }
           var i = 0
@@ -149,7 +172,7 @@ class StAXParser extends XMLParser {
             attrs = attrs + (QName(prefix, localName) -> xmlReader.getAttributeValue(i))
             i = i + 1
           }
-          val prefix =
+          val namespace =
             if(xmlReader.getPrefix.isEmpty) {
               val uri = xmlReader.getNamespaceURI
               if(uri == null)
@@ -159,12 +182,12 @@ class StAXParser extends XMLParser {
             }
             else
               NamespaceBinding(xmlReader.getPrefix, xmlReader.getNamespaceURI)
-          elems ::= ElemBuilder(prefix, xmlReader.getLocalName, scopes, attrs)
+          elems ::= ElemBuilder(xmlReader.getLocalName, scopes, attrs)
            results ::= VectorCase.newBuilder[Node]           
         }
         case _ =>
       }
     }
-    results.head.result.head.asInstanceOf[Elem]
+    results.head.result().head.asInstanceOf[Elem]
   }
 }
