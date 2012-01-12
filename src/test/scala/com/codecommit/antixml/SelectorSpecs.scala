@@ -58,9 +58,9 @@ class SelectorSpecs extends Specification {
 
   "the namespace element selector" should {
     "select only namespaced elements" in {
-      val ns = "http://www.w3.org/2005/Atom"
+      val ns = NSRepr("http://www.w3.org/2005/Atom")
 
-      <feed xmlns={ns}><entry/><other xmlns="urn:a"/></feed>.convert \ (ns -> "entry") mustEqual Group(<entry xmlns={ns}/>.convert)
+      <feed xmlns={ns.uri}><entry/><other xmlns="urn:a"/></feed>.convert \ (ns -> "entry") mustEqual Group(<entry xmlns={ns.uri}/>.convert)
     }
   }
 
@@ -101,8 +101,6 @@ class SelectorSpecs extends Specification {
       
       val result = bookstore \\ titlesOfBooksWithAuthors
       result mustEqual Vector("For Whom the Bell Tolls","I, Robot","Programming Scala")
-      
     }
   }
-  
 }

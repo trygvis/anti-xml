@@ -92,7 +92,7 @@ class ConversionSpecs extends Specification with ScalaCheck {
     /* Unbound namespaces are not allowed according to the XML NS specification, section 5: "Using Qualified Names",
      * under "Namespace constraint: Prefix Declared": The namespace prefix, unless it is xml or xmlns, MUST have been
      * declared in a namespace declaration attribute in either the start-tag of the element where the prefix is used or
-      * in an ancestor element (i.e., an element in whose content the prefixed markup occurs).
+     * in an ancestor element (i.e., an element in whose content the prefixed markup occurs).
 
     "convert elem names with namespaces" in {
       val e = <w:test/>.convert

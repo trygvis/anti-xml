@@ -196,13 +196,20 @@ sealed trait NamespaceBinding {
 
   def append(prefix: String, uri: String): NamespaceBinding = new PrefixedNamespaceBinding(prefix, uri, Some(this))
 
-  def findPrefix(prefix: String): Option[NamespaceBinding] = this match {
+  def findByPrefix(prefix: String): Option[NamespaceBinding] = this match {
     case UnprefixedNamespaceBinding(_, _) if(prefix.isEmpty) => Some(this)
-    case UnprefixedNamespaceBinding(_, Some(parent)) => parent.findPrefix(prefix)
+    case UnprefixedNamespaceBinding(_, Some(parent)) => parent.findByPrefix(prefix)
     case UnprefixedNamespaceBinding(_, None) => None
-    case PrefixedNamespaceBinding(p, _, Some(parent)) => if(p.equals(prefix)) Some(this) else parent.findPrefix(prefix)
+    case PrefixedNamespaceBinding(p, _, Some(parent)) => if(p.equals(prefix)) Some(this) else parent.findByPrefix(prefix)
     case PrefixedNamespaceBinding(p, _, None) => if(p.equals(prefix)) Some(this) else None
     case EmptyNamespaceBinding => None
+  }
+
+  def findByUri(uri: String): Option[NamespaceBinding] = {
+    if(this.uri.filter(uri ==).isDefined)
+      Some(this)
+    else
+      parent.flatMap(_.findByUri(uri))
   }
 
   /**
@@ -234,6 +241,13 @@ object NamespaceBinding {
 
 object NamespaceUri {
   def unapply(namespaceBinding: NamespaceBinding) = namespaceBinding.uri
+}
+
+sealed class NSRepr(val uri: String)
+
+object NSRepr {
+  def apply(uri: String): NSRepr = new NSRepr(uri)
+  def apply(nb: NamespaceBinding): NSRepr = new NSRepr(nb.uri.getOrElse(throw new IllegalArgumentException("A namespace binding has to have an URI")))
 }
 
 private [antixml] case object EmptyNamespaceBinding extends NamespaceBinding {

@@ -57,12 +57,16 @@ package object antixml {
    * @see [[com.codecommit.antixml.XMLConvertable]]
    */
   implicit def nodeSeqToConverter[A](a: A): Converter[A] = new Converter(a)
-  
+
   // I feel justified in this global implicit since it doesn't pimp anything
   implicit def stringTupleToQNameTuple(pair: (String, String)): (QName, String) = {
     val (key, value) = pair
     (QName(None, key), value)
   }
+
+  implicit def stringToNsRepr(s: String) = NSRepr(s)
+
+  implicit def namespaceBindingToNsRepr(nb: NamespaceBinding) = NSRepr(nb)
 
   /**
    * Wildcard selector which passes ''all'' nodes unmodified.  This is analogous
