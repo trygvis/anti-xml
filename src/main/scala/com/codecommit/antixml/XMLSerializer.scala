@@ -78,50 +78,73 @@ class XMLSerializer(encoding: String, outputDeclaration: Boolean) {
   }
   
   def serialize(elem: Elem, w: Writer) {
-    var scopes: List[NamespaceBinding] = Nil
+    /**
+     * A stack of prefix/uri declared on each element.
+     */
+    var namespaces: List[List[(String, String)]] = Nil
+
+    def namespaceDeclared(t: (String, String)) = {
+      namespaces.find(_.contains(t)).isDefined
+    }
+
+    /**
+     * A list of options. Each Some(uri) represents a change in the empty namespace.
+     */
+    var unprefixedUri: List[Option[String]] = Nil
 
     def doSerialize(node: Node, w: Writer) {
       node match {
         case Elem(prefix, name, attrs, scope, children) => {
-          val parentScope = scopes.headOption getOrElse NamespaceBinding.empty
-          scopes = scope :: scopes
+
+          val currentUnprefixedUri = unprefixedUri.find(_.isDefined).map(_.get).getOrElse("")
+
+          val (qname, xmlns): (String, String) = prefix match {
+            case EmptyNamespaceBinding =>
+              if (currentUnprefixedUri == "") {
+                unprefixedUri = None :: unprefixedUri
+                (name, "")
+              }
+              else {
+                unprefixedUri = Some("") :: unprefixedUri
+                (name, " xmlns=\"\"")
+              }
+            case UnprefixedNamespaceBinding(uri, _) =>
+              if (currentUnprefixedUri == uri) {
+                unprefixedUri = None :: unprefixedUri
+                (name, "")
+              }
+              else {
+                unprefixedUri = Some(uri) :: unprefixedUri
+                (name, " xmlns=\"" + uri + "\"")
+              }
+            case PrefixedNamespaceBinding(pfx, uri, _) =>
+              unprefixedUri = None :: unprefixedUri
+              val x: String = pfx + ":" + name
+              (x, "")
+          }
+
+          val newNamespaces = scope.toList.collect({
+            case p@PrefixedNamespaceBinding(pfx, uri, _) if !namespaceDeclared((pfx, uri)) => (pfx, uri)
+          })
+          
+          val prefixesStr = newNamespaces.foldLeft("")({(s, t) =>
+            s + " xmlns:" + t._1 + "=\"" + t._2 + "\""
+          })
+
+          namespaces = newNamespaces :: namespaces
+
           val attrStr = if (attrs.isEmpty) {
             ""
           } else {
             val delta = attrs map {
               case (key, value) => key.toString + "=" + Node.quoteAttribute(value)
             } mkString " "
-            
+
             " " + delta
           }
 
-//          println("scope.toList=" + scope.toList)
-//          println("parentScope.toList=" + parentScope.toList)
-          // val scopeChange = scope filter { case (key, value) => parentScope.get(key) != Some(value) }
-          val parentList = parentScope.toList
-          val scopeChange = scope.toList filterNot (parentList contains)// scope filter { case (key, value) => parentScope.get(key) != Some(value) }
-          val prefixesStr = if (scopeChange.isEmpty) {
-            ""
-          } else {
-            val delta = scopeChange map {
-              case UnprefixedNamespaceBinding(uri, _) => "xmlns=" + Node.quoteAttribute(uri)
-              case PrefixedNamespaceBinding(p, uri, _) => "xmlns:" + p + "=" + Node.quoteAttribute(uri)
-//              case (key, value) =>
-//                (if (key == "") "xmlns" else "xmlns:" + key) + "=" + Node.quoteAttribute(value)
-              case _ => sys.error("Shouldn't happen")
-            } mkString " "
-            
-            " " + delta
-          }
+          val partial = "<" + qname + xmlns + prefixesStr + attrStr
 
-//          val qname = (prefix map { _ + ":" } getOrElse "") + name
-          val qname = prefix match {
-            case EmptyNamespaceBinding => name
-            case UnprefixedNamespaceBinding(uri, _) => name
-            case PrefixedNamespaceBinding(p, uri, _) => p + ":" + name
-          }
-          val partial = "<" + qname + attrStr + prefixesStr
-          
           if (children.isEmpty) {
             w.append(partial)
             w.append("/>")
@@ -133,10 +156,11 @@ class XMLSerializer(encoding: String, outputDeclaration: Boolean) {
             w append(qname)
             w append('>')
           }
-          
-          scopes = scopes.tail
+
+          namespaces = namespaces.tail
+          unprefixedUri = unprefixedUri.tail
         }
-        
+
         case node => w.append(node.toString)
       }
     }

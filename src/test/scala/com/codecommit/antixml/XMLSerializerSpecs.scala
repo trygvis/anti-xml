@@ -34,12 +34,61 @@ class XMLSerializerSpecs extends Specification {
   import XML._
   
   "xml serialization" should {
+    "not redeclare undeclared NSes" in {
+      fromString("<a xmlns='urn:x'><b/></a>").toString mustEqual """<a xmlns="urn:x"><b/></a>"""
+    }
+
+    "serialize elements with multiple unprefixed bindings correctly" in {
+      val x = """<a xmlns="urn:x"><b xmlns="urn:y"/></a>"""
+      Elem(NamespaceBinding("urn:x"), "a", Attributes(), NamespaceBinding.empty, Group(
+        Elem(NamespaceBinding("urn:y"), "b", Attributes(), NamespaceBinding.empty, Group()))).toString mustEqual x
+    }
+
+    "not be fooled by unprefixed namespace bindings" in {
+      val x = """<a xmlns="urn:x"><b xmlns="urn:y"/></a>"""
+      Elem(NamespaceBinding("urn:x"), "a", Attributes(), NamespaceBinding("urn:y"), Group(
+        Elem(NamespaceBinding("urn:y"), "b", Attributes(), NamespaceBinding.empty, Group()))).toString mustEqual x
+    }
+
+    "not redeclared unnecessary re-reclared namespaces" in {
+      // The xmlns declaration on the 'b' element is not required and it optimized.
+      fromString("<a xmlns='urn:x'><b xmlns='urn:x'/></a>").toString mustEqual """<a xmlns="urn:x"><b/></a>"""
+    }
+
+    "declared redefined default namespaces namespaces" in {
+      fromString("<a xmlns='urn:x'><b xmlns='urn:y'/><b xmlns='urn:y'/></a>").toString mustEqual """<a xmlns="urn:x"><b xmlns="urn:y"/><b xmlns="urn:y"/></a>"""
+    }
+
     "serialize prefixes minimally" in {
       fromString("<my:test xmlns:my='urn:my-urn:quux'>\n<beef/>\n\t\n</my:test>").toString mustEqual "<my:test xmlns:my=\"urn:my-urn:quux\">\n<beef/>\n\t\n</my:test>"
     }
-    
+
     "serialize unprefixed elements correctly" in {
       fromString("<test xmlns='urn:my-urn:quux'>\n<beef/>\n\t\n</test>").toString mustEqual "<test xmlns=\"urn:my-urn:quux\">\n<beef/>\n\t\n</test>"
+    }
+
+    "serialize elements with multiple prefixes correctly" in {
+      val x = """
+      <a xmlns="urn:x">
+        <b xmlns="urn:y"/>
+        <b xmlns="urn:y"/>
+      </a>"""
+      fromString(x).toString mustEqual x.trim
+    }
+
+    /**
+     * This covers the use case where you know/suspect elements to use extra namespaces, like when Atom entries
+     * use Atom extensions.
+     */
+    "serialize pre-emptively added namespace correctly" in {
+      val atom = NamespaceBinding("urn:main")
+      val ext = NamespaceBinding("ext", "urn:ext")
+      val x = Elem(atom, "feed", Attributes(), ext, Group(
+        Elem(ext, "my-ext", Attributes(), NamespaceBinding.empty, Group()),
+        Elem(ext, "my-ext", Attributes(), NamespaceBinding.empty, Group())
+      ))
+
+      x.toString mustEqual """<feed xmlns="urn:main" xmlns:ext="urn:ext"><ext:my-ext/><ext:my-ext/></feed>"""
     }
   }
 }

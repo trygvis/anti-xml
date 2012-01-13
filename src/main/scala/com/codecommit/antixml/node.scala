@@ -143,12 +143,9 @@ case class ProcInstr(target: String, data: String) extends Node {
  * TODO: Clean up naming. Options:
  * 1) Rename prefix to namespace, scope to namespaces
  * 2) Remove prefix, rename scope to namespace(s), assume that the first is the name of the current element
- * 3) Rename prefix to namespace, scope to namespaces.
  */
 case class Elem(prefix: NamespaceBinding, name: String, attrs: Attributes, scope: NamespaceBinding, override val children: Group[Node]) extends Node with Selectable[Elem] {
-  import Elem.isValidName
-
-  if (! isValidName(name)) {
+  if (!Elem.isValidName(name)) {
     throw new IllegalArgumentException("Illegal element name, '" + name + "'")
   }
   
@@ -173,6 +170,7 @@ object Elem extends ((NamespaceBinding, String, Attributes, NamespaceBinding, Gr
     "[" + nameStartChar + "][" + nameStartChar + """\-\.0-9\u00B7\u0300-\u036F\u203F-\u2040]*"""r
   }
   def isValidName(string: String) = NameRegex.pattern.matcher(string).matches
+  def isValidNamespaceUri(uri: String) = uri.trim().length() > 0
 }
 
 /*
@@ -250,7 +248,7 @@ object NSRepr {
   def apply(nb: NamespaceBinding): NSRepr = new NSRepr(nb.uri.getOrElse(throw new IllegalArgumentException("A namespace binding has to have an URI")))
 }
 
-private [antixml] case object EmptyNamespaceBinding extends NamespaceBinding {
+private [antixml] object EmptyNamespaceBinding extends NamespaceBinding {
   def uri = None
   def parent = None
   def isEmpty = true
@@ -268,6 +266,9 @@ case class PrefixedNamespaceBinding(prefix: String, _uri: String,  override val 
   if (!Elem.isValidName(prefix)) {
     throw new IllegalArgumentException("Illegal namespace prefix, '" + prefix + "'")
   }
+  if (!Elem.isValidNamespaceUri(_uri)) {
+    throw new IllegalArgumentException("Illegal namespace uri, '" + _uri + "'")
+  }
 
   def uri = Some(_uri)
   def isEmpty = false
@@ -275,6 +276,10 @@ case class PrefixedNamespaceBinding(prefix: String, _uri: String,  override val 
 }
 
 case class UnprefixedNamespaceBinding(_uri: String,  override val parent: Option[NamespaceBinding] = None) extends NamespaceBinding {
+  if (!Elem.isValidNamespaceUri(_uri)) {
+    throw new IllegalArgumentException("Illegal namespace uri, '" + _uri + "'")
+  }
+
   def uri = Some(_uri)
   def isEmpty = false
   def looseParent = UnprefixedNamespaceBinding(_uri, None)
